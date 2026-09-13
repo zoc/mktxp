@@ -51,8 +51,19 @@ class RouteMetricsDataSource:
             return None
 
     @staticmethod
+    def _default_route_state(route_record):
+        ''' Tri-state status of a default route:
+                0 - flagged inactive by the router, so not a candidate at all
+                1 - a valid candidate, but not the route currently selected
+                2 - the active route
+        '''
+        if route_record.get('inactive') == 'true':
+            return 0
+        return 2 if route_record.get('active') == 'true' else 1
+
+    @staticmethod
     def default_route_records(router_entry, *, ipv6 = False):
-        ''' Default routes (0.0.0.0/0 or ::/0) records, with their active state
+        ''' Default routes (0.0.0.0/0 or ::/0) records, with their state
         '''
         ip_stack = 'ipv6' if ipv6 else 'ip'
         api_path = f'/{ip_stack}/route'
@@ -66,11 +77,11 @@ class RouteMetricsDataSource:
                 'gateway': record.get('gateway') or '',
                 'routing_table': record.get('routing-table') or record.get('routing-mark') or 'main',
                 'comment': record.get('comment') or '',
-                'active': 1 if record.get('active') == 'true' else 0
+                'state': RouteMetricsDataSource._default_route_state(record)
                 } for record in route_records if record.get('dst-address') == default_dst_address]
 
             return BaseDSProcessor.trimmed_records(router_entry, router_records = default_route_records,
-                                                                    metric_labels = ['gateway', 'routing_table', 'comment', 'active'])
+                                                                    metric_labels = ['gateway', 'routing_table', 'comment', 'state'])
         except Exception as exc:
             print(f'Error getting {"IPv6" if ipv6 else "IPv4"} default routes info from router {router_entry.router_name}@{router_entry.config_entry.hostname}: {exc}')
             return None

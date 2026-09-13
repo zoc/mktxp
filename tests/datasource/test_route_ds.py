@@ -41,8 +41,9 @@ class TestDefaultRouteRecords:
     def test_default_route_records_ipv4(self, mock_router_entry):
         router_entry, router_api, resource = mock_router_entry
         resource.call.return_value = [
-            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.0.1', 'routing-table': 'main', 'comment': 'ISP1 primary', 'active': 'true'},
-            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.1.1', 'routing-table': 'backup', 'comment': 'ISP2 failover', 'active': 'false'}
+            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.0.1', 'routing-table': 'main', 'comment': 'ISP1 primary', 'active': 'true', 'inactive': 'false'},
+            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.1.1', 'routing-table': 'backup', 'comment': 'ISP2 failover', 'active': 'false', 'inactive': 'false'},
+            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.2.1', 'routing-table': 'backup', 'comment': 'ISP3 dead', 'active': 'false', 'inactive': 'true'}
         ]
 
         records = RouteMetricsDataSource.default_route_records(router_entry)
@@ -51,14 +52,15 @@ class TestDefaultRouteRecords:
         resource.call.assert_called_once_with('print', {}, {'dst-address': '0.0.0.0/0'})
 
         assert records == [
-            {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 primary', 'active': 1, **router_entry.router_id},
-            {'gateway': '10.0.1.1', 'routing_table': 'backup', 'comment': 'ISP2 failover', 'active': 0, **router_entry.router_id}
+            {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 primary', 'state': 2, **router_entry.router_id},
+            {'gateway': '10.0.1.1', 'routing_table': 'backup', 'comment': 'ISP2 failover', 'state': 1, **router_entry.router_id},
+            {'gateway': '10.0.2.1', 'routing_table': 'backup', 'comment': 'ISP3 dead', 'state': 0, **router_entry.router_id}
         ]
 
     def test_default_route_records_ipv6(self, mock_router_entry):
         router_entry, router_api, resource = mock_router_entry
         resource.call.return_value = [
-            {'dst-address': '::/0', 'gateway': 'fe80::1%ether1', 'routing-table': 'main', 'comment': 'ISP1 v6', 'active': 'true'}
+            {'dst-address': '::/0', 'gateway': 'fe80::1%ether1', 'routing-table': 'main', 'comment': 'ISP1 v6', 'active': 'true', 'inactive': 'false'}
         ]
 
         records = RouteMetricsDataSource.default_route_records(router_entry, ipv6 = True)
@@ -67,7 +69,7 @@ class TestDefaultRouteRecords:
         resource.call.assert_called_once_with('print', {}, {'dst-address': '::/0'})
 
         assert records == [
-            {'gateway': 'fe80::1%ether1', 'routing_table': 'main', 'comment': 'ISP1 v6', 'active': 1, **router_entry.router_id}
+            {'gateway': 'fe80::1%ether1', 'routing_table': 'main', 'comment': 'ISP1 v6', 'state': 2, **router_entry.router_id}
         ]
 
     def test_default_route_records_filters_out_non_default_routes(self, mock_router_entry):
@@ -95,9 +97,9 @@ class TestDefaultRouteRecords:
         records = RouteMetricsDataSource.default_route_records(router_entry)
 
         assert records == [
-            {'gateway': '10.0.0.1', 'routing_table': 'isp2', 'comment': '', 'active': 1, **router_entry.router_id},
-            {'gateway': '10.0.0.2', 'routing_table': 'main', 'comment': '', 'active': 1, **router_entry.router_id},
-            {'gateway': '', 'routing_table': 'main', 'comment': '', 'active': 0, **router_entry.router_id}
+            {'gateway': '10.0.0.1', 'routing_table': 'isp2', 'comment': '', 'state': 2, **router_entry.router_id},
+            {'gateway': '10.0.0.2', 'routing_table': 'main', 'comment': '', 'state': 2, **router_entry.router_id},
+            {'gateway': '', 'routing_table': 'main', 'comment': '', 'state': 1, **router_entry.router_id}
         ]
 
     def test_default_route_records_no_default_route(self, mock_router_entry):
@@ -122,3 +124,19 @@ class TestDefaultRouteRecords:
         records = RouteMetricsDataSource.default_route_records(router_entry)
 
         assert records[0][MKTXPConfigKeys.CUSTOM_LABELS_METADATA_ID] == {'dc': 'london'}
+
+
+class TestDefaultRouteState:
+    """ The tri-state mapping, straight off the RouterOS inactive / active flags """
+
+    @pytest.mark.parametrize('route_record, expected_state', [
+        ({'inactive': 'true', 'active': 'false'}, 0),
+        ({'inactive': 'true', 'active': 'true'}, 0),     # inactive wins
+        ({'inactive': 'false', 'active': 'false'}, 1),
+        ({'inactive': 'false', 'active': 'true'}, 2),
+        ({'active': 'true'}, 2),                          # no inactive field (ROS 6)
+        ({'active': 'false'}, 1),
+        ({}, 1),
+    ])
+    def test_default_route_state(self, route_record, expected_state):
+        assert RouteMetricsDataSource._default_route_state(route_record) == expected_state

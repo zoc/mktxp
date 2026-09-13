@@ -76,12 +76,12 @@ class RouteCollector(BaseCollector):
         if router_entry.config_entry.default_ip_routes:
             default_route_records = RouteMetricsDataSource.default_route_records(router_entry)
             if default_route_records:
-                yield BaseCollector.gauge_collector('routes_default_route', 'Default route state (1 - active, 0 - inactive)',
-                                                        default_route_records, 'active', ['gateway', 'routing_table', 'comment'])
+                yield BaseCollector.gauge_collector('routes_default_route', 'Default route state (0 - inactive, 1 - candidate but not selected, 2 - active)',
+                                                        default_route_records, 'state', ['gateway', 'routing_table', 'comment'])
 
         # ~*~*~*~*~*~ IPv6 default routes ~*~*~*~*~*~
         if router_entry.config_entry.default_ipv6_routes:
             default_route_records = RouteMetricsDataSource.default_route_records(router_entry, ipv6=True)
             if default_route_records:
-                yield BaseCollector.gauge_collector('routes_default_route_ipv6', 'Default route state (IPv6) (1 - active, 0 - inactive)',
-                                                        default_route_records, 'active', ['gateway', 'routing_table', 'comment'])
+                yield BaseCollector.gauge_collector('routes_default_route_ipv6', 'Default route state (IPv6) (0 - inactive, 1 - candidate but not selected, 2 - active)',
+                                                        default_route_records, 'state', ['gateway', 'routing_table', 'comment'])
