@@ -65,11 +65,12 @@ class RouteMetricsDataSource:
             default_route_records = [{
                 'gateway': record.get('gateway') or '',
                 'routing_table': record.get('routing-table') or record.get('routing-mark') or 'main',
+                'comment': record.get('comment') or '',
                 'active': 1 if record.get('active') == 'true' else 0
                 } for record in route_records if record.get('dst-address') == default_dst_address]
 
             return BaseDSProcessor.trimmed_records(router_entry, router_records = default_route_records,
-                                                                    metric_labels = ['gateway', 'routing_table', 'active'])
+                                                                    metric_labels = ['gateway', 'routing_table', 'comment', 'active'])
         except Exception as exc:
             print(f'Error getting {"IPv6" if ipv6 else "IPv4"} default routes info from router {router_entry.router_name}@{router_entry.config_entry.hostname}: {exc}')
             return None

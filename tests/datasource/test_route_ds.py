@@ -41,8 +41,8 @@ class TestDefaultRouteRecords:
     def test_default_route_records_ipv4(self, mock_router_entry):
         router_entry, router_api, resource = mock_router_entry
         resource.call.return_value = [
-            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.0.1', 'routing-table': 'main', 'active': 'true'},
-            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.1.1', 'routing-table': 'backup', 'active': 'false'}
+            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.0.1', 'routing-table': 'main', 'comment': 'ISP1 primary', 'active': 'true'},
+            {'dst-address': '0.0.0.0/0', 'gateway': '10.0.1.1', 'routing-table': 'backup', 'comment': 'ISP2 failover', 'active': 'false'}
         ]
 
         records = RouteMetricsDataSource.default_route_records(router_entry)
@@ -51,14 +51,14 @@ class TestDefaultRouteRecords:
         resource.call.assert_called_once_with('print', {}, {'dst-address': '0.0.0.0/0'})
 
         assert records == [
-            {'gateway': '10.0.0.1', 'routing_table': 'main', 'active': 1, **router_entry.router_id},
-            {'gateway': '10.0.1.1', 'routing_table': 'backup', 'active': 0, **router_entry.router_id}
+            {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 primary', 'active': 1, **router_entry.router_id},
+            {'gateway': '10.0.1.1', 'routing_table': 'backup', 'comment': 'ISP2 failover', 'active': 0, **router_entry.router_id}
         ]
 
     def test_default_route_records_ipv6(self, mock_router_entry):
         router_entry, router_api, resource = mock_router_entry
         resource.call.return_value = [
-            {'dst-address': '::/0', 'gateway': 'fe80::1%ether1', 'routing-table': 'main', 'active': 'true'}
+            {'dst-address': '::/0', 'gateway': 'fe80::1%ether1', 'routing-table': 'main', 'comment': 'ISP1 v6', 'active': 'true'}
         ]
 
         records = RouteMetricsDataSource.default_route_records(router_entry, ipv6 = True)
@@ -67,7 +67,7 @@ class TestDefaultRouteRecords:
         resource.call.assert_called_once_with('print', {}, {'dst-address': '::/0'})
 
         assert records == [
-            {'gateway': 'fe80::1%ether1', 'routing_table': 'main', 'active': 1, **router_entry.router_id}
+            {'gateway': 'fe80::1%ether1', 'routing_table': 'main', 'comment': 'ISP1 v6', 'active': 1, **router_entry.router_id}
         ]
 
     def test_default_route_records_filters_out_non_default_routes(self, mock_router_entry):
@@ -95,9 +95,9 @@ class TestDefaultRouteRecords:
         records = RouteMetricsDataSource.default_route_records(router_entry)
 
         assert records == [
-            {'gateway': '10.0.0.1', 'routing_table': 'isp2', 'active': 1, **router_entry.router_id},
-            {'gateway': '10.0.0.2', 'routing_table': 'main', 'active': 1, **router_entry.router_id},
-            {'gateway': '', 'routing_table': 'main', 'active': 0, **router_entry.router_id}
+            {'gateway': '10.0.0.1', 'routing_table': 'isp2', 'comment': '', 'active': 1, **router_entry.router_id},
+            {'gateway': '10.0.0.2', 'routing_table': 'main', 'comment': '', 'active': 1, **router_entry.router_id},
+            {'gateway': '', 'routing_table': 'main', 'comment': '', 'active': 0, **router_entry.router_id}
         ]
 
     def test_default_route_records_no_default_route(self, mock_router_entry):

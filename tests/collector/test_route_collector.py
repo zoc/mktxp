@@ -48,8 +48,8 @@ def test_default_ip_routes_metrics():
     router_entry = _mock_router_entry(default_ip_routes = True)
 
     default_route_records = [
-        {'gateway': '10.0.0.1', 'routing_table': 'main', 'active': 1, **router_entry.router_id},
-        {'gateway': '10.0.1.1', 'routing_table': 'backup', 'active': 0, **router_entry.router_id}
+        {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 primary', 'active': 1, **router_entry.router_id},
+        {'gateway': '10.0.1.1', 'routing_table': 'backup', 'comment': '', 'active': 0, **router_entry.router_id}
     ]
 
     with patch('mktxp.collector.route_collector.RouteMetricsDataSource.default_route_records') as mock_ds:
@@ -66,8 +66,10 @@ def test_default_ip_routes_metrics():
     samples = {sample.labels['gateway']: sample for sample in default_route_metric.samples}
     assert samples['10.0.0.1'].value == 1
     assert samples['10.0.0.1'].labels['routing_table'] == 'main'
+    assert samples['10.0.0.1'].labels['comment'] == 'ISP1 primary'
     assert samples['10.0.1.1'].value == 0
     assert samples['10.0.1.1'].labels['routing_table'] == 'backup'
+    assert samples['10.0.1.1'].labels['comment'] == ''
 
     for sample in default_route_metric.samples:
         assert sample.labels[MKTXPConfigKeys.ROUTERBOARD_NAME] == 'test_router'
@@ -78,7 +80,7 @@ def test_default_ipv6_routes_metrics():
     router_entry = _mock_router_entry(default_ipv6_routes = True)
 
     default_route_records = [
-        {'gateway': 'fe80::1%ether1', 'routing_table': 'main', 'active': 1, **router_entry.router_id}
+        {'gateway': 'fe80::1%ether1', 'routing_table': 'main', 'comment': 'ISP1 v6', 'active': 1, **router_entry.router_id}
     ]
 
     with patch('mktxp.collector.route_collector.RouteMetricsDataSource.default_route_records') as mock_ds:
@@ -93,6 +95,7 @@ def test_default_ipv6_routes_metrics():
     assert len(default_route_metric.samples) == 1
     assert default_route_metric.samples[0].labels['gateway'] == 'fe80::1%ether1'
     assert default_route_metric.samples[0].labels['routing_table'] == 'main'
+    assert default_route_metric.samples[0].labels['comment'] == 'ISP1 v6'
     assert default_route_metric.samples[0].value == 1
 
 
@@ -118,8 +121,29 @@ def test_default_routes_independent_of_route_counts():
          patch('mktxp.collector.route_collector.RouteMetricsDataSource.default_route_records') as mock_default_ds:
         mock_counts_ds.return_value = None
         mock_default_ds.return_value = [
-            {'gateway': '10.0.0.1', 'routing_table': 'main', 'active': 1, **router_entry.router_id}
+            {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': '', 'active': 1, **router_entry.router_id}
         ]
         metrics = list(RouteCollector.collect(router_entry))
 
     assert [metric.name for metric in metrics] == ['mktxp_routes_default_route']
+
+
+def test_default_routes_comment_separates_otherwise_identical_routes():
+    """ Two routes sharing a gateway and routing table stay distinct series via their comments
+    """
+    router_entry = _mock_router_entry(default_ip_routes = True)
+
+    default_route_records = [
+        {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 primary', 'active': 1, **router_entry.router_id},
+        {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 standby', 'active': 0, **router_entry.router_id}
+    ]
+
+    with patch('mktxp.collector.route_collector.RouteMetricsDataSource.default_route_records') as mock_ds:
+        mock_ds.return_value = default_route_records
+        metrics = list(RouteCollector.collect(router_entry))
+
+    samples = metrics[0].samples
+    assert len(samples) == 2
+    assert {sample.labels['comment']: sample.value for sample in samples} == {
+        'ISP1 primary': 1, 'ISP1 standby': 0
+    }
