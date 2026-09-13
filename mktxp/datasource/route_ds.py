@@ -49,3 +49,27 @@ class RouteMetricsDataSource:
         except Exception as exc:
             print(f'Error getting {"IPv6" if ipv6 else "IPv4"} routes info from router {router_entry.router_name}@{router_entry.config_entry.hostname}: {exc}')
             return None
+
+    @staticmethod
+    def default_route_records(router_entry, *, ipv6 = False):
+        ''' Default routes (0.0.0.0/0 or ::/0) records, with their active state
+        '''
+        ip_stack = 'ipv6' if ipv6 else 'ip'
+        api_path = f'/{ip_stack}/route'
+        default_dst_address = '::/0' if ipv6 else '0.0.0.0/0'
+
+        try:
+            resource = router_entry.api_connection.router_api().get_resource(api_path)
+            route_records = resource.call('print', {}, {'dst-address': default_dst_address})
+
+            default_route_records = [{
+                'gateway': record.get('gateway') or '',
+                'routing_table': record.get('routing-table') or record.get('routing-mark') or 'main',
+                'active': 1 if record.get('active') == 'true' else 0
+                } for record in route_records if record.get('dst-address') == default_dst_address]
+
+            return BaseDSProcessor.trimmed_records(router_entry, router_records = default_route_records,
+                                                                    metric_labels = ['gateway', 'routing_table', 'active'])
+        except Exception as exc:
+            print(f'Error getting {"IPv6" if ipv6 else "IPv4"} default routes info from router {router_entry.router_name}@{router_entry.config_entry.hostname}: {exc}')
+            return None

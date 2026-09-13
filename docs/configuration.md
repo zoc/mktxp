@@ -152,6 +152,7 @@ Enable or disable specific metric collectors per router or globally under `[defa
 | `switch_port` | `False` | Switch chip port counters and statistics. |
 | `poe` | `True` | PoE output wattage, current, and port status. |
 | `route` / `ipv6_route` | `True` / `False` | Active routing table route counts. |
+| `default_ip_routes` / `default_ipv6_routes` | `False` | Default route (`0.0.0.0/0` / `::/0`) state, `1` when active and `0` when inactive, labeled by `gateway` and `routing_table`. |
 | `pool` / `ipv6_pool` | `True` / `False` | IP address pool utilization and counts. |
 | `firewall` / `ipv6_firewall` | `True` / `False` | Firewall filter and NAT rule byte/packet counters. |
 | `neighbor` / `ipv6_neighbor` | `True` / `False` | ARP and IPv6 neighbor discovery counts. |

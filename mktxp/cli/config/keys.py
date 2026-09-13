@@ -86,6 +86,7 @@ class MKTXPConfigKeys:
     FE_WG_PEER_KEY = 'wireguard_peers'
 
     FE_ROUTE_KEY = 'route'
+    FE_DEFAULT_IP_ROUTES_KEY = 'default_ip_routes'
     FE_DHCP_POOL_KEY = 'pool'
     FE_FIREWALL_KEY = 'firewall'
     FE_ADDRESS_LIST_KEY = 'address_list'
@@ -94,6 +95,7 @@ class MKTXPConfigKeys:
     FE_DNS_KEY = 'dns'
 
     FE_IPV6_ROUTE_KEY = 'ipv6_route'
+    FE_DEFAULT_IPV6_ROUTES_KEY = 'default_ipv6_routes'
     FE_IPV6_DHCP_POOL_KEY = 'ipv6_pool'
     FE_IPV6_FIREWALL_KEY = 'ipv6_firewall'
     FE_IPV6_ADDRESS_LIST_KEY = 'ipv6_address_list'
@@ -214,7 +216,8 @@ class MKTXPConfigKeys:
         FE_BFD_KEY, FE_BGP_KEY, FE_EOIP_KEY, FE_GRE_KEY, FE_IPIP_KEY,
         FE_IPSEC_KEY, FE_LTE_KEY, FE_SWITCH_PORT_KEY, FE_ROUTING_STATS_KEY,
         FE_CERTIFICATE_KEY, FE_DNS_KEY, FE_CONTAINER_KEY, FE_W60G_KEY,
-        FE_MODULE_ONLY_KEY, FE_BRIDGE_VLAN_KEY, FE_INTERFACE_WITH_DEFAULT_NAME
+        FE_MODULE_ONLY_KEY, FE_BRIDGE_VLAN_KEY, FE_INTERFACE_WITH_DEFAULT_NAME,
+        FE_DEFAULT_IP_ROUTES_KEY, FE_DEFAULT_IPV6_ROUTES_KEY
     }
 
     # Feature keys enabled by default
