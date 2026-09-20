@@ -25,7 +25,8 @@ MKTXP resolves configuration files (`mktxp.conf`, `_mktxp.conf`, and optional `s
    - `~/mktxp/`
    - Files: `~/mktxp/mktxp.conf` and `~/mktxp/_mktxp.conf`
 
-> 💡 Migration Tip: To migrate from the legacy `~/mktxp/` directory to the modern XDG standard:
+> [!TIP]
+> **Migration Tip**: To migrate from the legacy `~/mktxp/` directory to the modern XDG standard:
 > ```bash
 > mv ~/mktxp ~/.config/mktxp
 > ```

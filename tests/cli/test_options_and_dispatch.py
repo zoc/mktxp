@@ -159,3 +159,20 @@ def test_version_resolution():
     assert f"version {version}" in dispatcher.option_parser.description
 
 
+def test_options_parser_edit_permutations(tmp_path):
+    """Verify options parser accepts edit with -en and --cfg-dir in any position."""
+    conf = tmp_path / "mktxp.conf"
+    conf.write_text("[default]\n\n[test_router]\nhostname=192.168.88.1\n")
+
+    parser = MKTXPOptionsParser()
+    p1 = parser.parse_options(['--cfg-dir', str(tmp_path), '-en', 'test_router', 'edit'])
+    p2 = parser.parse_options(['--cfg-dir', str(tmp_path), 'edit', '-en', 'test_router'])
+    p3 = parser.parse_options(['edit', '--cfg-dir', str(tmp_path), '-en', 'test_router'])
+
+    for p in (p1, p2, p3):
+        assert p['sub_cmd'] == MKTXPCommands.EDIT
+        assert p['entry_name'] == 'test_router'
+        assert p['cfg_dir'] == str(tmp_path)
+
+
+

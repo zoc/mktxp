@@ -21,12 +21,17 @@ class RSCDispatcher:
     """Handles options registration, argument validation, and execution for RouterOS RSC commands."""
 
     @staticmethod
-    def register_cli_options(subparsers, add_entry_name_fn, help_formatter_cls) -> None:
+    def register_cli_options(
+        subparsers, add_entry_name_fn, help_formatter_cls, parents=None
+    ) -> None:
         """Register the 'rsc' subcommand and its 'format' and 'split' actions."""
+        kwargs = {"formatter_class": help_formatter_cls}
+        if parents:
+            kwargs["parents"] = parents
         rsc_parser = subparsers.add_parser(
             "rsc",
             description="RouterOS GitOps configuration formatter and splitter",
-            formatter_class=help_formatter_cls,
+            **kwargs,
         )
         rsc_subparsers = rsc_parser.add_subparsers(
             dest="rsc_cmd",
@@ -38,7 +43,7 @@ class RSCDispatcher:
         format_parser = rsc_subparsers.add_parser(
             "format",
             description="Formats raw RouterOS export into a single clean .rsc file",
-            formatter_class=help_formatter_cls,
+            **kwargs,
         )
         format_parser.add_argument(
             "-i",
@@ -116,7 +121,7 @@ class RSCDispatcher:
         split_parser = rsc_subparsers.add_parser(
             "split",
             description="Splits raw RouterOS export into modular GitOps directory structure",
-            formatter_class=help_formatter_cls,
+            **kwargs,
         )
         split_parser.add_argument(
             "-i",

@@ -131,7 +131,8 @@ Available Filters:
 - `--top [N]`: Show top N connection holders (default: `10`)
 - `--min-conns [N]`: Filter out background hosts with fewer than N active connections
 
-*(Note: Destination addresses are displayed when `connection_stats_destinations = True` is enabled in `mktxp.conf`.)*
+> [!NOTE]
+> Destination addresses are displayed when `connection_stats_destinations = True` is enabled in `mktxp.conf`.
 
 Example:
 
@@ -189,8 +190,10 @@ Unique lists: 2
 
 Pulls RouterOS Kid Control counters, translates them into human-readable bitrates, and calculates aggregate LAN throughput on the fly.
 
-> 💡 Tip: Using Kid Control as a Passive LAN Monitor  
+> [!TIP]
+> **Using Kid Control as a Passive LAN Monitor**  
 > MikroTik RouterOS does not natively track per-device real-time transfer rates (`rate_up`, `rate_down`), cumulative volume, or activity recency (`idle_time`) anywhere else without custom firewall mangle rules.  
+> 
 > You can repurpose Kid Control as an automated, passive LAN monitor without blocking or restricting traffic:
 > 1. In RouterOS, create a single 24/7 unlimited user profile to activate packet accounting:
 >    ```routeros
@@ -385,4 +388,5 @@ For diagnostic queries to succeed, ensure the router user has minimal required p
 /user add name=mktxp_user group=mktxp_group password=your_password
 ```
 
-*(Note: For LTE metrics on RouterOS v6, the user also needs the `test` permission policy.)*
+> [!NOTE]
+> For LTE metrics on RouterOS v6, the user also needs the `test` permission policy.
