@@ -71,6 +71,19 @@ class AddressListMetricsDataSource:
         return all_lists_counts
 
     @staticmethod
+    def count_selected_records(router_entry, address_lists, ip_version):
+        """Count entries for each selected address list using count-only queries."""
+        api_path = f"/{ip_version}/firewall/address-list"
+        selected_counts = {}
+        for list_name in address_lists:
+            count = BaseDSProcessor.count_records(
+                router_entry, api_path=api_path, api_query={"list": list_name}
+            )
+            if count is not None:
+                selected_counts[list_name] = count
+        return selected_counts
+
+    @staticmethod
     def count_metric_records(router_entry, address_lists, ip_version):
         api_path = f"/{ip_version}/firewall/address-list"
 

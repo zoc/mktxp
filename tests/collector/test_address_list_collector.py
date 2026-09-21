@@ -176,3 +176,139 @@ def test_address_list_collector_counts_disabled():
     assert 'mktxp_firewall_address_list_selected_count' in metric_names
     assert 'mktxp_firewall_address_list_all_count' not in metric_names
 
+
+def test_address_list_collector_entries_disabled():
+    """Verify that when address_list_entries is False, individual address metrics are skipped
+    while selected counts are collected via count-only queries without calling resource.get."""
+    config_handler()
+    mock_router_entry = MagicMock()
+    mock_router_entry.config_entry.address_list = "MyList, AnotherList"
+    mock_router_entry.config_entry.address_list_entries = False
+    mock_router_entry.config_entry.total_address_list_counts = True
+    mock_router_entry.config_entry.ipv6_address_list = None
+    mock_router_entry.router_name = "TestRouter"
+    mock_router_entry.config_entry.hostname = "testhost"
+    mock_router_entry.api_connection = MagicMock()
+    mock_router_entry.router_id = {
+        MKTXPConfigKeys.ROUTERBOARD_NAME: 'test_router',
+        MKTXPConfigKeys.ROUTERBOARD_ADDRESS: '1.2.3.4'
+    }
+
+    mock_api = MagicMock()
+    mock_router_entry.api_connection.router_api.return_value = mock_api
+    mock_resource = MagicMock()
+    # get should NOT be called because individual records are bypassed
+    mock_resource.get.side_effect = AssertionError("resource.get() should not be called when address_list_entries=False")
+
+    ip_response = [
+        {'list': 'MyList', 'address': '192.168.1.1', 'dynamic': 'false'},
+        {'list': 'MyList', 'address': '192.168.1.2', 'dynamic': 'true'},
+        {'list': 'AnotherList', 'address': '10.0.0.1', 'dynamic': 'false'}
+    ]
+
+    def call_side_effect(command, params, query):
+        assert command == 'print'
+        assert params == {'count-only': ''}
+        filtered = ip_response
+        if 'list' in query:
+            filtered = [r for r in filtered if r.get('list') == query['list']]
+        if 'dynamic' in query:
+            is_dyn = query['dynamic'] == 'yes'
+            filtered = [r for r in filtered if (r.get('dynamic') == 'true') == is_dyn]
+        return MagicMock(done_message={'ret': str(len(filtered))})
+
+    mock_resource.call.side_effect = call_side_effect
+    mock_api.get_resource.return_value = mock_resource
+
+    metrics = list(AddressListCollector.collect(mock_router_entry))
+    metric_names = [m.name for m in metrics]
+
+    assert 'mktxp_firewall_address_list' not in metric_names
+    assert 'mktxp_firewall_address_list_selected_count' in metric_names
+    assert 'mktxp_firewall_address_list_all_count' in metric_names
+
+    selected_metric = next(m for m in metrics if m.name == 'mktxp_firewall_address_list_selected_count')
+    samples = {s.labels['list']: s.value for s in selected_metric.samples}
+    assert samples == {'MyList': 2, 'AnotherList': 1}
+
+
+def test_address_list_collector_ipv6_entries_disabled():
+    """Verify that when ipv6_address_list_entries is False, individual IPv6 address metrics are skipped
+    while selected counts are collected via count-only queries."""
+    config_handler()
+    mock_router_entry = MagicMock()
+    mock_router_entry.config_entry.address_list = None
+    mock_router_entry.config_entry.ipv6_address_list = "IPv6List"
+    mock_router_entry.config_entry.ipv6_address_list_entries = False
+    mock_router_entry.config_entry.ipv6_total_address_list_counts = False
+    mock_router_entry.router_name = "TestRouter"
+    mock_router_entry.config_entry.hostname = "testhost"
+    mock_router_entry.api_connection = MagicMock()
+    mock_router_entry.router_id = {
+        MKTXPConfigKeys.ROUTERBOARD_NAME: 'test_router',
+        MKTXPConfigKeys.ROUTERBOARD_ADDRESS: '1.2.3.4'
+    }
+
+    mock_api = MagicMock()
+    mock_router_entry.api_connection.router_api.return_value = mock_api
+    mock_resource = MagicMock()
+    mock_resource.get.side_effect = AssertionError("resource.get() should not be called when ipv6_address_list_entries=False")
+
+    ipv6_response = [
+        {'list': 'IPv6List', 'address': '::1', 'dynamic': 'false'}
+    ]
+
+    def call_side_effect(command, params, query):
+        assert command == 'print'
+        assert params == {'count-only': ''}
+        filtered = ipv6_response
+        if 'list' in query:
+            filtered = [r for r in filtered if r.get('list') == query['list']]
+        return MagicMock(done_message={'ret': str(len(filtered))})
+
+    mock_resource.call.side_effect = call_side_effect
+    mock_api.get_resource.return_value = mock_resource
+
+    metrics = list(AddressListCollector.collect(mock_router_entry))
+    metric_names = [m.name for m in metrics]
+
+    assert 'mktxp_firewall_address_list_ipv6' not in metric_names
+    assert 'mktxp_firewall_address_list_all_count_ipv6' not in metric_names
+    assert 'mktxp_firewall_address_list_selected_count_ipv6' in metric_names
+
+    selected_metric = next(m for m in metrics if m.name == 'mktxp_firewall_address_list_selected_count_ipv6')
+    samples = {s.labels['list']: s.value for s in selected_metric.samples}
+    assert samples == {'IPv6List': 1}
+
+
+def test_address_list_collector_entries_and_counts_disabled():
+    """Verify that when both address_list_entries and total_address_list_counts are False,
+    only selected list counts are emitted."""
+    config_handler()
+    mock_router_entry = MagicMock()
+    mock_router_entry.config_entry.address_list = "DropList"
+    mock_router_entry.config_entry.address_list_entries = False
+    mock_router_entry.config_entry.total_address_list_counts = False
+    mock_router_entry.config_entry.ipv6_address_list = None
+    mock_router_entry.router_name = "TestRouter"
+    mock_router_entry.config_entry.hostname = "testhost"
+    mock_router_entry.api_connection = MagicMock()
+    mock_router_entry.router_id = {
+        MKTXPConfigKeys.ROUTERBOARD_NAME: 'test_router',
+        MKTXPConfigKeys.ROUTERBOARD_ADDRESS: '1.2.3.4'
+    }
+
+    mock_api = MagicMock()
+    mock_router_entry.api_connection.router_api.return_value = mock_api
+    mock_resource = MagicMock()
+    mock_resource.call.return_value = MagicMock(done_message={'ret': '42'})
+    mock_api.get_resource.return_value = mock_resource
+
+    metrics = list(AddressListCollector.collect(mock_router_entry))
+    metric_names = [m.name for m in metrics]
+
+    assert metric_names == ['mktxp_firewall_address_list_selected_count']
+    assert metrics[0].samples[0].labels['list'] == 'DropList'
+    assert metrics[0].samples[0].value == 42
+
+

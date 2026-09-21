@@ -187,7 +187,8 @@ Enable or disable specific metric collectors per router or globally under `[defa
 | `firewall` / `ipv6_firewall` | `True` / `False` | Firewall filter and NAT rule byte/packet counters. |
 | `neighbor` / `ipv6_neighbor` | `True` / `False` | ARP and IPv6 neighbor discovery counts. |
 | `address_list` / `ipv6_address_list` | `None` | Comma-separated list of firewall address-lists to track specifically. |
-| `total_address_list_counts` | `True` | Emit aggregate entry counts across all address lists. |
+| `address_list_entries` / `ipv6_address_list_entries` | `True` | Emit individual address list entry metrics (`mktxp_firewall_address_list`). Set `False` to avoid high cardinality when only list counts are needed. |
+| `total_address_list_counts` / `ipv6_total_address_list_counts` | `True` | Emit aggregate entry counts across all address lists. |
 | `dhcp` / `dhcp_lease` | `True` | DHCP server statistics and active lease details. |
 | `connections` | `True` | Active IP connection tracking totals. |
 | `connection_stats` | `False` | Detailed TCP/UDP/ICMP connection breakdowns. |

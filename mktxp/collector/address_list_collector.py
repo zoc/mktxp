@@ -38,6 +38,7 @@ class AddressListCollector(BaseCollector):
         )
         if address_list_names:
             count_all_ipv4 = getattr(router_entry.config_entry, "total_address_list_counts", True)
+            entries_ipv4 = getattr(router_entry.config_entry, "address_list_entries", True)
             yield from AddressListCollector._collect_and_yield_metrics(
                 router_entry,
                 address_list_names,
@@ -46,6 +47,7 @@ class AddressListCollector(BaseCollector):
                 reduced_metric_labels,
                 translation_table,
                 count_all=count_all_ipv4,
+                include_entries=entries_ipv4,
             )
 
         # IPv6
@@ -54,6 +56,7 @@ class AddressListCollector(BaseCollector):
         )
         if ipv6_address_list_names:
             count_all_ipv6 = getattr(router_entry.config_entry, "ipv6_total_address_list_counts", True)
+            entries_ipv6 = getattr(router_entry.config_entry, "ipv6_address_list_entries", True)
             yield from AddressListCollector._collect_and_yield_metrics(
                 router_entry,
                 ipv6_address_list_names,
@@ -62,6 +65,7 @@ class AddressListCollector(BaseCollector):
                 reduced_metric_labels,
                 translation_table,
                 count_all=count_all_ipv6,
+                include_entries=entries_ipv6,
             )
 
     @staticmethod
@@ -73,43 +77,69 @@ class AddressListCollector(BaseCollector):
         reduced_metric_labels,
         translation_table,
         count_all=True,
+        include_entries=True,
     ):
         ipv6_suffix = "_ipv6" if ip_version == "ipv6" else ""
         records = None
 
         if address_list_names:
-            # 1. Collect and yield address list entries for explicitly requested lists
-            records = AddressListMetricsDataSource.metric_records(
-                router_entry,
-                address_list_names,
-                ip_version,
-                metric_labels=metric_labels,
-                translation_table=translation_table,
-            )
-            if records:
-                yield BaseCollector.gauge_collector(
-                    f"firewall_address_list{ipv6_suffix}",
-                    f"Firewall {ip_version.upper()} Address List Entry",
-                    records,
-                    "timeout",
-                    reduced_metric_labels,
+            if include_entries:
+                # 1. Collect and yield address list entries for explicitly requested lists
+                records = AddressListMetricsDataSource.metric_records(
+                    router_entry,
+                    address_list_names,
+                    ip_version,
+                    metric_labels=metric_labels,
+                    translation_table=translation_table,
                 )
+                if records:
+                    yield BaseCollector.gauge_collector(
+                        f"firewall_address_list{ipv6_suffix}",
+                        f"Firewall {ip_version.upper()} Address List Entry",
+                        records,
+                        "timeout",
+                        reduced_metric_labels,
+                    )
 
-            # 2. Count selected lists in-memory from the already fetched records
-            selected_lists_records = []
-            for list_name in address_list_names:
-                count = sum(1 for r in (records or []) if r.get("list") == list_name)
-                selected_lists_records.append(
-                    {"list": list_name, "count": count, **router_entry.router_id}
+                # 2. Count selected lists in-memory from the already fetched records
+                selected_lists_records = []
+                for list_name in address_list_names:
+                    count = sum(1 for r in (records or []) if r.get("list") == list_name)
+                    selected_lists_records.append(
+                        {"list": list_name, "count": count, **router_entry.router_id}
+                    )
+                if selected_lists_records:
+                    yield BaseCollector.gauge_collector(
+                        f"firewall_address_list_selected_count{ipv6_suffix}",
+                        f"Number of addresses in the selected {ip_version.upper()} address list",
+                        selected_lists_records,
+                        "count",
+                        ["list"],
+                    )
+            else:
+                # 2. Count selected lists via count-only query (without fetching all address entries)
+                selected_counts = AddressListMetricsDataSource.count_selected_records(
+                    router_entry, address_list_names, ip_version
                 )
-            if selected_lists_records:
-                yield BaseCollector.gauge_collector(
-                    f"firewall_address_list_selected_count{ipv6_suffix}",
-                    f"Number of addresses in the selected {ip_version.upper()} address list",
-                    selected_lists_records,
-                    "count",
-                    ["list"],
-                )
+                if selected_counts is not None:
+                    selected_lists_records = []
+                    for list_name in address_list_names:
+                        if list_name in selected_counts:
+                            selected_lists_records.append(
+                                {
+                                    "list": list_name,
+                                    "count": selected_counts[list_name],
+                                    **router_entry.router_id,
+                                }
+                            )
+                    if selected_lists_records:
+                        yield BaseCollector.gauge_collector(
+                            f"firewall_address_list_selected_count{ipv6_suffix}",
+                            f"Number of addresses in the selected {ip_version.upper()} address list",
+                            selected_lists_records,
+                            "count",
+                            ["list"],
+                        )
 
         # 3. Collect global counts across all lists on router via count-only query (if enabled)
         if count_all:
