@@ -22,12 +22,17 @@ class ConfigCLI:
     """Handles CLI options registration and actions related to configuration inspection and editing (show, edit)."""
 
     @staticmethod
-    def register_show_options(subparsers, add_entry_name_fn, help_formatter_cls) -> None:
+    def register_show_options(
+        subparsers, add_entry_name_fn, help_formatter_cls, parents=None
+    ) -> None:
         """Register the 'show' subcommand."""
+        kwargs = {"formatter_class": help_formatter_cls}
+        if parents:
+            kwargs["parents"] = parents
         show_parser = subparsers.add_parser(
             "show",
             description="Displays MKTXP config router entries",
-            formatter_class=help_formatter_cls,
+            **kwargs,
         )
         add_entry_name_fn(show_parser, registered_only=True, required=False, help="Config entry name")
         show_parser.add_argument(
@@ -39,13 +44,25 @@ class ConfigCLI:
         )
 
     @staticmethod
-    def register_edit_options(subparsers, help_formatter_cls) -> None:
+    def register_edit_options(
+        subparsers, help_formatter_cls, add_entry_name_fn=None, parents=None
+    ) -> None:
         """Register the 'edit' subcommand."""
+        kwargs = {"formatter_class": help_formatter_cls}
+        if parents:
+            kwargs["parents"] = parents
         edit_parser = subparsers.add_parser(
             "edit",
-            description="Edits an existing MKTXP router entry",
-            formatter_class=help_formatter_cls,
+            description="Edits MKTXP configuration file or jumps to a specific router entry",
+            **kwargs,
         )
+        if add_entry_name_fn:
+            add_entry_name_fn(
+                edit_parser,
+                registered_only=True,
+                required=False,
+                help="Config entry name to edit (jumps to entry section in editor)",
+            )
         optional_args_group = edit_parser.add_argument_group("Optional Arguments")
         optional_args_group.add_argument(
             "-ed",
@@ -111,8 +128,37 @@ class ConfigCLI:
             return
 
         editor_cmd = shlex.split(editor)
+        target_file = (
+            config_handler.mktxp_conf_path
+            if args.get("internal")
+            else config_handler.usr_conf_data_path
+        )
 
-        if args.get("internal"):
-            subprocess.check_call(editor_cmd + [config_handler.mktxp_conf_path])
+        entry_name = args.get("entry_name")
+        target_line = None
+        if entry_name and not args.get("internal") and os.path.exists(target_file):
+            target_header = f"[{entry_name.strip()}]"
+            try:
+                with open(target_file, "r", encoding="utf-8", errors="replace") as f:
+                    for idx, line in enumerate(f, start=1):
+                        if line.strip() == target_header:
+                            target_line = idx
+                            break
+            except OSError:
+                pass
+
+        if target_line:
+            editor_base = os.path.basename(editor_cmd[0]).lower()
+            if editor_base in ("code", "code-insiders", "cursor"):
+                editor_cmd = editor_cmd + ["-g", f"{target_file}:{target_line}"]
+            elif editor_base in ("subl", "sublime_text"):
+                editor_cmd = editor_cmd + [f"{target_file}:{target_line}"]
+            elif editor_base in ("mate",):
+                editor_cmd = editor_cmd + ["-l", str(target_line), target_file]
+            else:
+                # Standard CLI editors (nano, vi, vim, nvim, emacs, micro, joe, etc.) accept +LINE
+                editor_cmd = editor_cmd + [f"+{target_line}", target_file]
         else:
-            subprocess.check_call(editor_cmd + [config_handler.usr_conf_data_path])
+            editor_cmd = editor_cmd + [target_file]
+
+        subprocess.check_call(editor_cmd)

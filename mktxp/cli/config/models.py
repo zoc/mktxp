@@ -58,6 +58,7 @@ class ConfigEntry:
             MKTXPConfigKeys.FE_DHCP_POOL_KEY,
             MKTXPConfigKeys.FE_FIREWALL_KEY,
             MKTXPConfigKeys.FE_ADDRESS_LIST_KEY,
+            MKTXPConfigKeys.FE_ADDRESS_LIST_ENTRIES_KEY,
             MKTXPConfigKeys.FE_TOTAL_ADDRESS_LIST_COUNTS_KEY,
             MKTXPConfigKeys.FE_NEIGHBOR_KEY,
             MKTXPConfigKeys.FE_DNS_KEY,
@@ -66,6 +67,7 @@ class ConfigEntry:
             MKTXPConfigKeys.FE_IPV6_DHCP_POOL_KEY,
             MKTXPConfigKeys.FE_IPV6_FIREWALL_KEY,
             MKTXPConfigKeys.FE_IPV6_ADDRESS_LIST_KEY,
+            MKTXPConfigKeys.FE_IPV6_ADDRESS_LIST_ENTRIES_KEY,
             MKTXPConfigKeys.FE_IPV6_TOTAL_ADDRESS_LIST_COUNTS_KEY,
             MKTXPConfigKeys.FE_IPV6_NEIGHBOR_KEY,
             MKTXPConfigKeys.FE_USER_KEY,
@@ -90,6 +92,8 @@ class ConfigEntry:
             MKTXPConfigKeys.FE_CUSTOM_LABELS_KEY,
             MKTXPConfigKeys.FE_MODULE_ONLY_KEY,
             MKTXPConfigKeys.FE_INTERFACE_WITH_DEFAULT_NAME,
+            MKTXPConfigKeys.RSC_SSH_PORT_KEY,
+            MKTXPConfigKeys.RSC_SSH_USER_KEY,
         ],
     )
 

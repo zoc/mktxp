@@ -88,3 +88,22 @@ def test_config_cli_edit_no_editor_found(capsys):
     captured = capsys.readouterr()
     assert 'No editor found to edit configuration files' in captured.out
 
+
+def test_config_cli_edit_with_entry_name_jump(tmp_path):
+    """Verify ConfigCLI.edit jumps to entry section line in editor."""
+    from unittest.mock import patch
+    from mktxp.cli.config import CustomConfig
+
+    conf = tmp_path / "mktxp.conf"
+    conf.write_text("[default]\n\n[router1]\nhostname=1.1.1.1\n\n[router2]\nhostname=2.2.2.2\n")
+    config_handler(CustomConfig(str(tmp_path)))
+
+    with patch('subprocess.check_call') as mock_sub:
+        ConfigCLI.edit({'entry_name': 'router2', 'editor': 'vim', 'internal': False})
+        mock_sub.assert_called_once_with(['vim', '+6', str(conf)])
+
+    with patch('subprocess.check_call') as mock_sub:
+        ConfigCLI.edit({'entry_name': 'router2', 'editor': 'code', 'internal': False})
+        mock_sub.assert_called_once_with(['code', '-g', f"{str(conf)}:6"])
+
+

@@ -96,7 +96,8 @@ Create a dedicated monitoring user on your MikroTik router:
 /user add name=mktxp_user group=mktxp_group password=secret_password
 ```
 
-*(Note: For LTE metrics on RouterOS v6, the user also needs the `test` permission policy.)*
+> [!NOTE]
+> For LTE metrics on RouterOS v6, the user also needs the `test` permission policy.
 
 > 📖 *For complete parameter references, `[default]` section inheritance, custom labels, parallel fetching, and diagnostic tuning, see the [Configuration Guide](https://github.com/akpw/mktxp/blob/main/docs/configuration.md).*
 
@@ -134,7 +135,9 @@ Sample output:
 Matching CAPsMAN clients: 2 (Total connected: 127)
 ```
 
-> 💡 Tip: Appending `-h` to any command (e.g. `mktxp diag -kc -h`) dynamically scopes help to only that command's filters.  
+> [!TIP]
+> Appending `-h` to any command (e.g. `mktxp diag -kc -h`) dynamically scopes help to only that command's filters.
+
 > 📖 *For more diagnostic domains, table schemas, and recipes, see the [Diagnostics Guide](https://github.com/akpw/mktxp/blob/main/docs/diagnostics.md).*
 
 ---
@@ -160,12 +163,13 @@ Import the official [Grafana Dashboard (ID: 13679)](https://grafana.com/grafana/
 
 <img width="32%" alt="Traffic & Interface" src="https://user-images.githubusercontent.com/5028474/217029083-3c2f561e-853f-45a7-b9f1-d818a830daf5.png"> <img width="32%" alt="Wireless Clients" src="https://user-images.githubusercontent.com/5028474/217029092-2b86b41b-1f89-4383-ac48-16652e820f7e.png"> <img width="32%" alt="Device Health" src="https://user-images.githubusercontent.com/5028474/217029096-dbf6b46c-3ed7-4c76-a57b-8cebfb3b671c.png">
 
-> 💡 Tip: Want centralized RouterOS logs too? [MKTXP Stack](https://github.com/akpw/mktxp-stack) is an out-of-the-box Docker Compose deployment that packages MKTXP alongside Prometheus / Grafana stack with pre-configured dashboards, and adds centralized MikroTik syslog processing via Loki and Promtail.
-
+> [!TIP]
+> **Centralized RouterOS Logs with MKTXP Stack**: [MKTXP Stack](https://github.com/akpw/mktxp-stack) is an out-of-the-box Docker Compose deployment that packages MKTXP alongside Prometheus and Grafana with pre-configured dashboards, and adds centralized MikroTik syslog processing via Loki and Promtail.
 
 <img width="50%" alt="MKTXP Stack Centralized Logging" src="https://user-images.githubusercontent.com/5028474/210771516-06a3e6ab-8eab-458c-9f38-5d44f95d23d4.png">
 
-> 💡 Tip: 📖 *For dynamic multi-target discovery (`/probe`), Docker/Kubernetes, and systemd/FreeBSD service deployment, see the [Exporter Guide](https://github.com/akpw/mktxp/blob/main/docs/exporter.md).*
+> [!NOTE]
+> For dynamic multi-target discovery (`/probe`), Docker/Kubernetes, and systemd/FreeBSD service deployment, see the [Exporter Guide](https://github.com/akpw/mktxp/blob/main/docs/exporter.md).
 
 ---
 

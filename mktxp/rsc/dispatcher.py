@@ -21,12 +21,17 @@ class RSCDispatcher:
     """Handles options registration, argument validation, and execution for RouterOS RSC commands."""
 
     @staticmethod
-    def register_cli_options(subparsers, add_entry_name_fn, help_formatter_cls) -> None:
+    def register_cli_options(
+        subparsers, add_entry_name_fn, help_formatter_cls, parents=None
+    ) -> None:
         """Register the 'rsc' subcommand and its 'format' and 'split' actions."""
+        kwargs = {"formatter_class": help_formatter_cls}
+        if parents:
+            kwargs["parents"] = parents
         rsc_parser = subparsers.add_parser(
             "rsc",
             description="RouterOS GitOps configuration formatter and splitter",
-            formatter_class=help_formatter_cls,
+            **kwargs,
         )
         rsc_subparsers = rsc_parser.add_subparsers(
             dest="rsc_cmd",
@@ -38,7 +43,7 @@ class RSCDispatcher:
         format_parser = rsc_subparsers.add_parser(
             "format",
             description="Formats raw RouterOS export into a single clean .rsc file",
-            formatter_class=help_formatter_cls,
+            **kwargs,
         )
         format_parser.add_argument(
             "-i",
@@ -116,7 +121,7 @@ class RSCDispatcher:
         split_parser = rsc_subparsers.add_parser(
             "split",
             description="Splits raw RouterOS export into modular GitOps directory structure",
-            formatter_class=help_formatter_cls,
+            **kwargs,
         )
         split_parser.add_argument(
             "-i",
@@ -130,10 +135,10 @@ class RSCDispatcher:
             split_parser,
             registered_only=True,
             required=False,
-            help="Router entry name from mktxp.conf for live export over SSH",
+            allow_all=True,
+            help="Router entry name from mktxp.conf for live export over SSH, or '__all__' for all enabled routers",
         )
         split_parser.add_argument(
-            "-d",
             "-o",
             "--out-dir",
             dest="out_dir",
@@ -149,16 +154,10 @@ class RSCDispatcher:
             help="Include passwords and sensitive keys in live export",
         )
         split_parser.add_argument(
-            "--numbered",
-            dest="numbered_files",
-            action="store_true",
-            default=None,
-            help="Prefix split filenames with numeric indices",
-        )
-        split_parser.add_argument(
             "--no-numbered",
-            dest="numbered_files",
-            action="store_false",
+            dest="no_numbered",
+            action="store_true",
+            default=False,
             help="Do not prefix split filenames with numeric indices",
         )
         split_parser.add_argument(
@@ -234,11 +233,19 @@ class RSCDispatcher:
                 print(f"Input file does not exist or is not readable: {args['input']}")
                 parser.exit()
 
+        if args.get("entry_name") == "__all__" and args.get("rsc_cmd") != "split":
+            print("The '__all__' entry is only supported for 'rsc split'")
+            parser.exit()
+
     @staticmethod
     def dispatch(args: dict) -> None:
         rsc_conf = config_handler.rsc_config()
 
         entry_name = args.get("entry_name")
+        if entry_name == "__all__":
+            RSCDispatcher._dispatch_split_all(args, rsc_conf)
+            return
+
         if entry_name:
             config_entry = config_handler.config_entry(entry_name)
             if not config_entry:
@@ -290,18 +297,23 @@ class RSCDispatcher:
         elif args["rsc_cmd"] == "split":
             extract_scripts = args.get("extract_scripts", False) or extract_scripts_conf
             out_dir = args.get("out_dir")
-            if not out_dir:
-                base_dir = rsc_conf.get("base_dir", "./exports")
+            if out_dir:
+                out_dir = os.path.expanduser(os.path.expandvars(out_dir))
+            else:
+                base_dir = os.path.expanduser(
+                    os.path.expandvars(rsc_conf.get("base_dir", "./exports"))
+                )
                 if entry_name:
                     sub_name = entry_name
                 else:
                     sub_name = os.path.splitext(os.path.basename(args["input"]))[0]
                 out_dir = os.path.join(base_dir, sub_name)
 
+            numbered = not args.get("no_numbered", False) if "no_numbered" in args else args.get("numbered", True)
             emitted_files = engine.split(
                 raw_text=raw_text,
                 output_dir=out_dir,
-                numbered=args.get("numbered", True),
+                numbered=numbered,
                 wrap_lines=args.get("wrap_lines", False),
                 wrap_col=args.get("wrap_col", 80),
                 extract_scripts=extract_scripts,
@@ -313,3 +325,86 @@ class RSCDispatcher:
             )
             for fname in sorted(emitted_files.keys()):
                 print(f"  |- {fname}")
+
+    @staticmethod
+    def _dispatch_split_all(args: dict, rsc_conf: dict) -> None:
+        registered = list(config_handler.registered_entries())
+        enabled_routers = [
+            name
+            for name in registered
+            if config_handler.config_entry(name)
+            and config_handler.config_entry(name).enabled
+        ]
+        disabled_routers = [
+            name
+            for name in registered
+            if config_handler.config_entry(name)
+            and not config_handler.config_entry(name).enabled
+        ]
+
+        if not enabled_routers:
+            print("No enabled router entries found in mktxp.conf")
+            return
+
+        for d_name in disabled_routers:
+            print(f"Skipping disabled router '{d_name}'")
+
+        engine = RSCEngine(rsc_conf)
+        extract_scripts_conf = rsc_conf.get("extract_scripts", False)
+        if isinstance(extract_scripts_conf, str):
+            extract_scripts_conf = extract_scripts_conf.lower() in ("true", "1", "yes")
+        extract_scripts = args.get("extract_scripts", False) or extract_scripts_conf
+
+        base_dir = os.path.expanduser(
+            os.path.expandvars(args.get("out_dir") or rsc_conf.get("base_dir", "./exports"))
+        )
+
+        total = len(enabled_routers)
+        succeeded = 0
+        failed = []
+
+        for idx, router_name in enumerate(enabled_routers, 1):
+            config_entry = config_handler.config_entry(router_name)
+            print(
+                f"\n[{idx}/{total}] Fetching live RouterOS export from '{router_name}' ({config_entry.hostname})..."
+            )
+            fetcher = SSHExportFetcher.from_config_entry(
+                entry_name=router_name,
+                config_entry=config_entry,
+                rsc_conf=rsc_conf,
+                cli_overrides=args,
+            )
+            try:
+                raw_text = fetcher.fetch_export()
+            except Exception as exc:
+                print(f"Error fetching live export from '{router_name}': {exc}")
+                failed.append((router_name, str(exc)))
+                continue
+
+            out_dir = os.path.join(base_dir, router_name)
+            numbered = not args.get("no_numbered", False) if "no_numbered" in args else args.get("numbered", True)
+            try:
+                emitted_files = engine.split(
+                    raw_text=raw_text,
+                    output_dir=out_dir,
+                    numbered=numbered,
+                    wrap_lines=args.get("wrap_lines", False),
+                    wrap_col=args.get("wrap_col", 80),
+                    extract_scripts=extract_scripts,
+                    strip_dynamic_macs=args.get("strip_macs", False),
+                )
+                print(
+                    f"Successfully split RouterOS export into {len(emitted_files)} files in: {out_dir}"
+                )
+                for fname in sorted(emitted_files.keys()):
+                    print(f"  |- {fname}")
+                succeeded += 1
+            except Exception as exc:
+                print(f"Error splitting export for '{router_name}': {exc}")
+                failed.append((router_name, str(exc)))
+
+        print(f"\nBatch split completed: {succeeded}/{total} routers succeeded.")
+        if failed:
+            print("Failed routers:")
+            for name, err in failed:
+                print(f"  - {name}: {err}")

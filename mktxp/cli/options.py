@@ -12,7 +12,7 @@
 ## GNU General Public License for more details.
 
 import os
-from argparse import ArgumentParser, HelpFormatter
+from argparse import ArgumentParser, HelpFormatter, SUPPRESS
 from mktxp._version import __version__
 from mktxp.cli.config import config_handler, CustomConfig
 from mktxp.cli.config.actions import ConfigCLI
@@ -32,18 +32,8 @@ class MKTXPCommands:
 
     @classmethod
     def commands_meta(cls):
-        return "".join(
-            (
-                "{",
-                f"{cls.DIAG}, ",
-                f"{cls.RSC}, ",
-                f"{cls.EXPORT}, ",
-                f"{cls.EDIT}, ",
-                f"{cls.SHOW}, ",
-                f"{cls.INFO}, ",
-                "}",
-            )
-        )
+        cmds = [cls.DIAG, cls.RSC, cls.EXPORT, cls.EDIT, cls.SHOW, cls.INFO]
+        return "{" + ", ".join(cmds) + "}"
 
 
 class MKTXPOptionsParser:
@@ -68,11 +58,69 @@ For more information, run: 'mktxp -h'
         return self._script_name
 
     # Options Parsing Workflow
+    @staticmethod
+    def _normalize_cli_args(args):
+        if not args:
+            return args
+        known_cmds = {
+            MKTXPCommands.DIAG,
+            MKTXPCommands.PRINT,
+            MKTXPCommands.RSC,
+            MKTXPCommands.EXPORT,
+            MKTXPCommands.EDIT,
+            MKTXPCommands.SHOW,
+            MKTXPCommands.INFO,
+        }
+        subcmd_idx = None
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            if arg in ("--cfg-dir", "-ed", "--editor"):
+                i += 2
+                continue
+            if arg in known_cmds:
+                subcmd_idx = i
+                break
+            i += 1
+
+        if subcmd_idx is not None and subcmd_idx > 0:
+            extracted = []
+            new_prefix = []
+            i = 0
+            while i < subcmd_idx:
+                arg = args[i]
+                if arg in ("-en", "--entry-name"):
+                    extracted.append(arg)
+                    if i + 1 < subcmd_idx:
+                        extracted.append(args[i + 1])
+                        i += 2
+                        continue
+                    i += 1
+                    continue
+                elif arg.startswith("--entry-name="):
+                    extracted.append(arg)
+                    i += 1
+                    continue
+                else:
+                    new_prefix.append(arg)
+                    i += 1
+            if extracted:
+                return new_prefix + [args[subcmd_idx]] + extracted + args[subcmd_idx + 1 :]
+        return args
+
     def parse_options(self, cli_args=None):
+        if cli_args is None:
+            import sys
+            cli_args = sys.argv[1:]
+        else:
+            cli_args = list(cli_args)
+
+        cli_args = self._normalize_cli_args(cli_args)
+
         global_options_parser = ArgumentParser(add_help=False)
         self.parse_global_options(global_options_parser)
         namespace, _ = global_options_parser.parse_known_args(cli_args)
-        if namespace.cfg_dir:
+        if getattr(namespace, "cfg_dir", None):
             config_handler(CustomConfig(namespace.cfg_dir))
         else:
             config_handler()
@@ -83,8 +131,10 @@ For more information, run: 'mktxp -h'
             formatter_class=MKTXPHelpFormatter,
             parents=[global_options_parser],
         )
-        self.parse_commands(commands_parser)
+        self.parse_commands(commands_parser, global_options_parser)
         args = vars(commands_parser.parse_args(cli_args))
+        if "cfg_dir" not in args:
+            args["cfg_dir"] = getattr(namespace, "cfg_dir", None)
 
         self._check_args(args, commands_parser)
         return args
@@ -93,16 +143,19 @@ For more information, run: 'mktxp -h'
         parser.add_argument(
             "--cfg-dir",
             dest="cfg_dir",
+            default=SUPPRESS,
             type=lambda d: self._is_valid_dir_path(parser, d),
             help="MKTXP config files directory (optional)",
         )
 
-    def parse_commands(self, parser):
+    def parse_commands(self, parser, global_options_parser=None):
         subparsers = parser.add_subparsers(
             dest="sub_cmd",
             title="MKTXP commands",
             metavar=MKTXPCommands.commands_meta(),
         )
+        parents = [global_options_parser] if global_options_parser else None
+        kwargs = {"parents": parents} if parents else {}
 
         # 1. Diag command (with print as alias)
         diag_parser = subparsers.add_parser(
@@ -111,6 +164,7 @@ For more information, run: 'mktxp -h'
             description="Displays selected metrics and diagnostics on the command line",
             usage="%(prog)s -en ENTRY [COMMAND] [FILTERS]",
             formatter_class=MKTXPHelpFormatter,
+            **kwargs,
         )
         required_args_group = diag_parser.add_argument_group("Required Arguments")
         self._add_entry_name(
@@ -145,26 +199,37 @@ For more information, run: 'mktxp -h'
             handler.register_filter_options(diag_parser)
 
         # 2. RSC command
-        RSCDispatcher.register_cli_options(subparsers, self._add_entry_name, MKTXPHelpFormatter)
+        RSCDispatcher.register_cli_options(
+            subparsers, self._add_entry_name, MKTXPHelpFormatter, parents=parents
+        )
 
         # 3. Export command
         subparsers.add_parser(
             MKTXPCommands.EXPORT,
-            description="Starts exporting Miktorik Router Metrics to Prometheus",
+            description="Starts exporting MikroTik Router Metrics to Prometheus",
             formatter_class=MKTXPHelpFormatter,
+            **kwargs,
         )
 
         # 4. Edit command
-        ConfigCLI.register_edit_options(subparsers, MKTXPHelpFormatter)
+        ConfigCLI.register_edit_options(
+            subparsers,
+            MKTXPHelpFormatter,
+            add_entry_name_fn=self._add_entry_name,
+            parents=parents,
+        )
 
         # 5. Show command
-        ConfigCLI.register_show_options(subparsers, self._add_entry_name, MKTXPHelpFormatter)
+        ConfigCLI.register_show_options(
+            subparsers, self._add_entry_name, MKTXPHelpFormatter, parents=parents
+        )
 
         # 6. Info command
         subparsers.add_parser(
             MKTXPCommands.INFO,
             description="Displays MKTXP info",
             formatter_class=MKTXPHelpFormatter,
+            **kwargs,
         )
 
     # Options checking
@@ -179,11 +244,15 @@ For more information, run: 'mktxp -h'
             MKTXPCommands.DIAG,
             MKTXPCommands.PRINT,
             MKTXPCommands.RSC,
+            MKTXPCommands.EDIT,
         ):
             if args.get("entry_name"):
-                args["entry_name"] = UniquePartialMatchList(
-                    config_handler.registered_entries()
-                ).find(args["entry_name"])
+                if args["entry_name"] == "__all__":
+                    pass
+                else:
+                    args["entry_name"] = UniquePartialMatchList(
+                        config_handler.registered_entries()
+                    ).find(args["entry_name"])
 
         if args["sub_cmd"] in (MKTXPCommands.DIAG, MKTXPCommands.PRINT):
             if not config_handler.config_entry(args["entry_name"]).enabled:
@@ -222,11 +291,15 @@ For more information, run: 'mktxp -h'
             return path_arg
 
     @staticmethod
-    def _add_entry_name(parser, registered_only=False, required=True, help="MKTXP Entry name"):
+    def _add_entry_name(
+        parser, registered_only=False, required=True, help="MKTXP Entry name", allow_all=False
+    ):
         registered_entries = []
         if registered_only:
             try:
                 registered_entries = list(config_handler.registered_entries())
+                if allow_all:
+                    registered_entries.append("__all__")
                 if registered_entries:
                     help = f"{help} (choose from: {', '.join(registered_entries)})"
             except Exception as exc:

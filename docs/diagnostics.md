@@ -22,22 +22,22 @@
 
 ## Quick Reference
 
-| Command | Shortcut | Purpose | Primary Filters |
+| Flag | Long Option | Purpose | Primary Filters |
 | :--- | :--- | :--- | :--- |
-| `mktxp diag -wc` | `--wifi` | Standalone RouterOS v7 WiFi / WiFiWave2 clients | `--low-signal`, `--low-rate`, `--band`, `--recent` |
-| `mktxp diag -cc` | `--caps` | CAPsMAN managed wireless clients across APs | `--low-signal`, `--low-rate`, `--band`, `--recent`, `-in` |
-| `mktxp diag -dc` | `--dhcp` | DHCP server leases and rogue device auditing | `--unidentified`, `--dynamic`, `--active-only` |
-| `mktxp diag -cn` | `--conn` | Open IP connection sockets per source host | `--top [N]`, `--min-conns [N]` |
-| `mktxp diag -al` | `--addr` | Firewall address lists (IPv4 and IPv6) | `--dynamic-only`, `--static-only` |
-| `mktxp diag -kc` | `--kid` | Real-time per-device bandwidth & LAN throughput | `--top [N]`, `--active`, `--rate-above [RATE]` |
-| `mktxp diag -nw` | `--net` | Netwatch ICMP ping monitors & gateway checks | `--down-only`, `--up-only` |
-| `mktxp diag -im` | `--interface` | Ethernet & SFP link status, PHY rates & optical DOM | `--degraded [RATE]`, `--plugged`, `--unplugged`, `--rate`, `--sfp-only` |
+| `-wc` | `--wifi_clients` | Standalone RouterOS v7 WiFi / WiFiWave2 clients | `--low-signal`, `--low-rate`, `--band`, `--recent` |
+| `-cc` | `--capsman_clients` | CAPsMAN managed wireless clients across APs | `--low-signal`, `--low-rate`, `--band`, `--recent`, `-in` |
+| `-dc` | `--dhcp_clients` | DHCP server leases and rogue device auditing | `--unidentified`, `--dynamic`, `--active-only` |
+| `-cn` | `--conn_stats` | Open IP connection sockets per source host | `--top [N]`, `--min-conns [N]` |
+| `-al` | `--address_lists` | Firewall address lists (IPv4 and IPv6) | `--dynamic-only`, `--static-only` |
+| `-kc` | `--kid_control` | Real-time per-device bandwidth & LAN throughput | `--top [N]`, `--active`, `--rate-above [RATE]` |
+| `-nw` | `--netwatch` | Netwatch ICMP ping monitors & gateway checks | `--down-only`, `--up-only` |
+| `-im` | `--interface-monitor` | Ethernet & SFP link status, PHY rates & optical DOM | `--degraded [RATE]`, `--plugged`, `--unplugged`, `--rate`, `--sfp-only` |
 
 ---
 
 ## CLI Ergonomics & Scoped Help
 
-1. Prefix Matching: You don't have to type full flags. The options parser matches any unique initial prefix sequence—`--wifi`, `--caps`, `--dhcp`, `--conn`, `--kid`, `--addr`, `--net`, and `--interface` resolve cleanly.
+1. Short and Long Flags: You can use standard two-letter flags (`-wc`, `-dc`, `-nw`) or full options (`--wifi_clients`, `--dhcp_clients`, `--netwatch`). Argparse prefix matching also accepts unique initial prefixes (such as `--wifi` or `--net`).
 2. Context-Aware Scoped Help: Appending `-h` to any domain narrows help down to the switches relevant to that command, printing active thresholds from your `_mktxp.conf` (see the [Configuration Guide](configuration.md#3-diag--live-diagnostics-thresholds) to tune defaults):
    ```bash
    ❯ mktxp diag -en ROUTER -kc -h
@@ -131,7 +131,8 @@ Available Filters:
 - `--top [N]`: Show top N connection holders (default: `10`)
 - `--min-conns [N]`: Filter out background hosts with fewer than N active connections
 
-*(Note: Destination addresses are displayed when `connection_stats_destinations = True` is enabled in `mktxp.conf`.)*
+> [!NOTE]
+> Destination addresses are displayed when `connection_stats_destinations = True` is enabled in `mktxp.conf`.
 
 Example:
 
@@ -189,8 +190,10 @@ Unique lists: 2
 
 Pulls RouterOS Kid Control counters, translates them into human-readable bitrates, and calculates aggregate LAN throughput on the fly.
 
-> 💡 Tip: Using Kid Control as a Passive LAN Monitor  
+> [!TIP]
+> **Using Kid Control as a Passive LAN Monitor**  
 > MikroTik RouterOS does not natively track per-device real-time transfer rates (`rate_up`, `rate_down`), cumulative volume, or activity recency (`idle_time`) anywhere else without custom firewall mangle rules.  
+> 
 > You can repurpose Kid Control as an automated, passive LAN monitor without blocking or restricting traffic:
 > 1. In RouterOS, create a single 24/7 unlimited user profile to activate packet accounting:
 >    ```routeros
@@ -385,4 +388,5 @@ For diagnostic queries to succeed, ensure the router user has minimal required p
 /user add name=mktxp_user group=mktxp_group password=your_password
 ```
 
-*(Note: For LTE metrics on RouterOS v6, the user also needs the `test` permission policy.)*
+> [!NOTE]
+> For LTE metrics on RouterOS v6, the user also needs the `test` permission policy.
