@@ -59,6 +59,22 @@ def _patched_receive(self, tag):
         return response
 routeros_api.api_communicator.base.ApiCommunicatorBase.receive = _patched_receive
 
+# 4. CPython's ssl module leaves an ERR_LIB_SYS entry on the thread's OpenSSL error queue when it raises
+#    OSError (python/cpython#158313), so every later TLS read on that thread, on any connection, re-raises
+#    the same stale error (e.g. ETIMEDOUT after a router reboot) until the process restarts.
+#    Clearing the queue before each use of the API works around it.
+import ctypes
+import _ssl
+try:
+    _openssl_err_clear_error = ctypes.CDLL(_ssl.__file__).ERR_clear_error
+    _openssl_err_clear_error.restype = None
+except (AttributeError, OSError):
+    _openssl_err_clear_error = None
+
+def clear_openssl_error_queue():
+    if _openssl_err_clear_error:
+        _openssl_err_clear_error()
+
 # done with patching hopefully, moving on
 from routeros_api import RouterOsApiPool
 
@@ -155,6 +171,7 @@ class RouterAPIConnection:
 
     @check_connected
     def router_api(self):
+        clear_openssl_error_queue()
         return self.api
 
     def _in_connect_timeout(self, connect_timestamp):

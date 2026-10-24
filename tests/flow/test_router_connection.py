@@ -133,3 +133,29 @@ def test_routeros_api_receive_monkey_patch():
 
     # Verify the tag was cleaned from the buffer despite the exception
     assert tag not in communicator.response_buffor
+
+
+def test_router_api_clears_stale_openssl_error_queue():
+    # python/cpython#158313: a stale ERR_LIB_SYS entry on the thread's queue makes every later TLS read raise
+    import ctypes, errno, _ssl
+    libssl = ctypes.CDLL(_ssl.__file__)
+    if not all(hasattr(libssl, name) for name in ('ERR_new', 'ERR_set_error', 'ERR_peek_error')):
+        pytest.skip('OpenSSL 3 error API not available')
+    libssl.ERR_peek_error.restype = ctypes.c_ulong
+    ERR_LIB_SYS = 2
+
+    pool = MagicMock()
+    pool.connected = False
+    pool.get_api.return_value = object()
+    with patch('mktxp.flow.router_connection.RouterOsApiPool', return_value = pool):
+        connection = RouterAPIConnection('router-a', _config_entry(use_ssl = False))
+        connection._in_connect_timeout = lambda *_: False
+        connection.connect()
+        pool.connected = True
+
+        libssl.ERR_new()
+        libssl.ERR_set_error(ERR_LIB_SYS, errno.ETIMEDOUT, None)
+        assert libssl.ERR_peek_error() != 0
+
+        assert connection.router_api() is pool.get_api.return_value
+        assert libssl.ERR_peek_error() == 0
