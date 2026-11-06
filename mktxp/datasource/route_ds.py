@@ -12,6 +12,7 @@
 ## GNU General Public License for more details.
 
 
+import ipaddress
 from mktxp.datasource.base_ds import BaseDSProcessor
 
 
@@ -62,6 +63,21 @@ class RouteMetricsDataSource:
         return 2 if route_record.get('active') == 'true' else 1
 
     @staticmethod
+    def _route_interface(route_record):
+        ''' Egress interface of a route (ROS 7): immediate-gw / gateway as 'ip%iface', or a bare interface name
+        '''
+        for gateway in (route_record.get('immediate-gw'), route_record.get('gateway')):
+            if not gateway:
+                continue
+            if '%' in gateway:
+                return gateway.rsplit('%', 1)[1]
+            try:
+                ipaddress.ip_address(gateway)
+            except ValueError:
+                return gateway
+        return ''
+
+    @staticmethod
     def default_route_records(router_entry, *, ipv6 = False):
         ''' Default routes (0.0.0.0/0 or ::/0) records, with their state
         '''
@@ -76,12 +92,13 @@ class RouteMetricsDataSource:
             default_route_records = [{
                 'gateway': record.get('gateway') or '',
                 'routing_table': record.get('routing-table') or record.get('routing-mark') or 'main',
+                'interface': RouteMetricsDataSource._route_interface(record),
                 'comment': record.get('comment') or '',
                 'state': RouteMetricsDataSource._default_route_state(record)
                 } for record in route_records if record.get('dst-address') == default_dst_address]
 
             return BaseDSProcessor.trimmed_records(router_entry, router_records = default_route_records,
-                                                                    metric_labels = ['gateway', 'routing_table', 'comment', 'state'])
+                                                                    metric_labels = ['gateway', 'interface', 'routing_table', 'comment', 'state'])
         except Exception as exc:
             print(f'Error getting {"IPv6" if ipv6 else "IPv4"} default routes info from router {router_entry.router_name}@{router_entry.config_entry.hostname}: {exc}')
             return None

@@ -48,7 +48,7 @@ def test_default_ip_routes_metrics():
     router_entry = _mock_router_entry(default_ip_routes = True)
 
     default_route_records = [
-        {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 primary', 'state': 2, **router_entry.router_id},
+        {'gateway': '10.0.0.1', 'interface': 'V832-ORANGE', 'routing_table': 'main', 'comment': 'ISP1 primary', 'state': 2, **router_entry.router_id},
         {'gateway': '10.0.1.1', 'routing_table': 'backup', 'comment': '', 'state': 1, **router_entry.router_id},
         {'gateway': '10.0.2.1', 'routing_table': 'backup', 'comment': 'dead', 'state': 0, **router_entry.router_id}
     ]
@@ -68,6 +68,8 @@ def test_default_ip_routes_metrics():
     assert samples['10.0.0.1'].value == 2
     assert samples['10.0.0.1'].labels['routing_table'] == 'main'
     assert samples['10.0.0.1'].labels['comment'] == 'ISP1 primary'
+    assert samples['10.0.0.1'].labels['interface'] == 'V832-ORANGE'
+    assert samples['10.0.1.1'].labels['interface'] == ''
     assert samples['10.0.1.1'].value == 1
     assert samples['10.0.1.1'].labels['routing_table'] == 'backup'
     assert samples['10.0.1.1'].labels['comment'] == ''

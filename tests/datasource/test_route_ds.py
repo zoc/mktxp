@@ -52,9 +52,9 @@ class TestDefaultRouteRecords:
         resource.call.assert_called_once_with('print', {}, {'dst-address': '0.0.0.0/0'})
 
         assert records == [
-            {'gateway': '10.0.0.1', 'routing_table': 'main', 'comment': 'ISP1 primary', 'state': 2, **router_entry.router_id},
-            {'gateway': '10.0.1.1', 'routing_table': 'backup', 'comment': 'ISP2 failover', 'state': 1, **router_entry.router_id},
-            {'gateway': '10.0.2.1', 'routing_table': 'backup', 'comment': 'ISP3 dead', 'state': 0, **router_entry.router_id}
+            {'gateway': '10.0.0.1', 'interface': '', 'routing_table': 'main', 'comment': 'ISP1 primary', 'state': 2, **router_entry.router_id},
+            {'gateway': '10.0.1.1', 'interface': '', 'routing_table': 'backup', 'comment': 'ISP2 failover', 'state': 1, **router_entry.router_id},
+            {'gateway': '10.0.2.1', 'interface': '', 'routing_table': 'backup', 'comment': 'ISP3 dead', 'state': 0, **router_entry.router_id}
         ]
 
     def test_default_route_records_ipv6(self, mock_router_entry):
@@ -69,7 +69,7 @@ class TestDefaultRouteRecords:
         resource.call.assert_called_once_with('print', {}, {'dst-address': '::/0'})
 
         assert records == [
-            {'gateway': 'fe80::1%ether1', 'routing_table': 'main', 'comment': 'ISP1 v6', 'state': 2, **router_entry.router_id}
+            {'gateway': 'fe80::1%ether1', 'interface': 'ether1', 'routing_table': 'main', 'comment': 'ISP1 v6', 'state': 2, **router_entry.router_id}
         ]
 
     def test_default_route_records_filters_out_non_default_routes(self, mock_router_entry):
@@ -97,9 +97,9 @@ class TestDefaultRouteRecords:
         records = RouteMetricsDataSource.default_route_records(router_entry)
 
         assert records == [
-            {'gateway': '10.0.0.1', 'routing_table': 'isp2', 'comment': '', 'state': 2, **router_entry.router_id},
-            {'gateway': '10.0.0.2', 'routing_table': 'main', 'comment': '', 'state': 2, **router_entry.router_id},
-            {'gateway': '', 'routing_table': 'main', 'comment': '', 'state': 1, **router_entry.router_id}
+            {'gateway': '10.0.0.1', 'interface': '', 'routing_table': 'isp2', 'comment': '', 'state': 2, **router_entry.router_id},
+            {'gateway': '10.0.0.2', 'interface': '', 'routing_table': 'main', 'comment': '', 'state': 2, **router_entry.router_id},
+            {'gateway': '', 'interface': '', 'routing_table': 'main', 'comment': '', 'state': 1, **router_entry.router_id}
         ]
 
     def test_default_route_records_no_default_route(self, mock_router_entry):
@@ -124,6 +124,21 @@ class TestDefaultRouteRecords:
         records = RouteMetricsDataSource.default_route_records(router_entry)
 
         assert records[0][MKTXPConfigKeys.CUSTOM_LABELS_METADATA_ID] == {'dc': 'london'}
+
+
+class TestRouteInterface:
+
+    @pytest.mark.parametrize('route_record, expected_interface', [
+        ({'gateway': '10.0.0.1', 'immediate-gw': '10.0.0.1%V832-ORANGE'}, 'V832-ORANGE'),
+        ({'gateway': 'pppoe-out1', 'immediate-gw': 'pppoe-out1'}, 'pppoe-out1'),
+        ({'gateway': 'l2tp.milkywan@vrf-dmz', 'immediate-gw': 'l2tp.milkywan'}, 'l2tp.milkywan'),   # VRF tunnel
+        ({'gateway': '10.0.0.1%V932-SOSH'}, 'V932-SOSH'),
+        ({'gateway': 'fe80::1%ether1'}, 'ether1'),
+        ({'gateway': '10.0.0.1'}, ''),
+        ({}, ''),
+    ])
+    def test_route_interface(self, route_record, expected_interface):
+        assert RouteMetricsDataSource._route_interface(route_record) == expected_interface
 
 
 class TestDefaultRouteState:
